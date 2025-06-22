@@ -98,7 +98,7 @@ def while_tqdm(  # noqa: D401 – function acts as a decorator factory
 
         return wrapper_progress_bar_body  # type: ignore[return-value]
 
-    return _while_tqdm, close_tqdm
+    return _while_tqdm
 
 
 # -----------------------------------------------------------------------------
@@ -108,10 +108,9 @@ if __name__ == "__main__":
     import jax
     import jax.numpy as jnp
     from time import sleep 
-    from tqdm import tqdm
-    
-    max_iters = 10
+    max_iters = 100000000
 
+    @while_tqdm(max_iters)
     def body(carry: tuple[int, jnp.ndarray]) -> tuple[int, jnp.ndarray]:
         i, acc = carry
         return (i + 1, acc + i)
@@ -120,17 +119,6 @@ if __name__ == "__main__":
         i, _ = carry
         return i < max_iters // 2  # the progress bar will stop prematurely, we only know an upper bound on i ahead of time. Also the bar is not removed then
 
-    wrapper, close_tqdm = while_tqdm(max_iters, leave=False)
-    body = wrapper(body)
     final_carry = jax.lax.while_loop(cond, body, (0, jnp.zeros(())))
-    print('done')
-    close_tqdm(final_carry, max_iters, final_carry.id if hasattr(final_carry, 'id') else 0)  # here we pass max_iters - 1 as a hack to pretend the end of the loop has been reached
-    
+    sleep(10)
     print("Final carry:", final_carry)
-    sleep(2)
-    
-    # to check whether old pbar got removed
-    for i in tqdm(list(range(10)), leave=False):
-        sleep(1/8)
-        
-    sleep(2)
