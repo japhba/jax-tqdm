@@ -1,3 +1,4 @@
+from time import sleep
 from typing import Any, Callable, Optional, TypeVar
 
 from jax_tqdm.base import PBar, build_tqdm  # type: ignore
@@ -106,7 +107,7 @@ def while_tqdm(  # noqa: D401 – function acts as a decorator factory
 if __name__ == "__main__":
     import jax
     import jax.numpy as jnp
-
+    from time import sleep 
     max_iters = 100000000
 
     @while_tqdm(max_iters)
@@ -116,7 +117,8 @@ if __name__ == "__main__":
 
     def cond(carry):
         i, _ = carry
-        return i < max_iters // 2  # the progress bar will stop prematurely, we only know an upper bound on i ahead of time
+        return i < max_iters // 2  # the progress bar will stop prematurely, we only know an upper bound on i ahead of time. Also the bar is not removed then
 
     final_carry = jax.lax.while_loop(cond, body, (0, jnp.zeros(())))
+    sleep(10)
     print("Final carry:", final_carry)
