@@ -57,12 +57,13 @@ def while_tqdm(  # noqa: D401 – function acts as a decorator factory
     loops, this decorator will seamlessly integrate with it.
     """
 
+    last_is_postfix = kwargs.pop('last_is_postfix', False)
     update_progress_bar, close_tqdm = build_tqdm(n, print_rate, tqdm_type, **kwargs)
 
     def _while_tqdm(func: WhileFn) -> WrappedWhileFn:  # noqa: D401
         """Internal decorator that injects the progress-bar logic."""
 
-        def wrapper_progress_bar(carry: Z) -> Z:  # type: ignore[override]
+        def wrapper_progress_bar_body(carry: Z) -> Z:  # type: ignore[override]
             # Detect whether we are nested inside an existing PBar.
             if isinstance(carry, PBar):
                 bar_id = carry.id
@@ -77,10 +78,12 @@ def while_tqdm(  # noqa: D401 – function acts as a decorator factory
             else:
                 # Fall-back: assume the *carry* **is** the iteration counter.
                 iter_num = inner_carry  # type: ignore[assignment]
+                
+            postfix = carry[-1]
 
             # Update the progress-bar.  ``build_tqdm`` expects a tuple so we
             # wrap and unwrap accordingly.
-            (inner_carry,) = update_progress_bar((inner_carry,), iter_num, bar_id, {'carry': carry})
+            (inner_carry,) = update_progress_bar((inner_carry,), iter_num, bar_id, postfix if isinstance(postfix, dict) and last_is_postfix else {})
 
             # Call the original body function.
             result = func(inner_carry)  # type: ignore[arg-type]
@@ -92,7 +95,7 @@ def while_tqdm(  # noqa: D401 – function acts as a decorator factory
             # Potentially close the bar when *iter_num* reaches *n - 1*.
             return close_tqdm(result, iter_num, bar_id)  # type: ignore[return-value]
 
-        return wrapper_progress_bar  # type: ignore[return-value]
+        return wrapper_progress_bar_body  # type: ignore[return-value]
 
     return _while_tqdm
 
