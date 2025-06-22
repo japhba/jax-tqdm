@@ -130,6 +130,9 @@ def build_tqdm(
             callback(_close_tqdm, bar_id, ordered=True)
             return _result
 
+        # jax.debug.print("x={}", n)
+        # jax.debug.print("x={}", iter_num)
+        # jax.debug.print("x={}", bar_id)
         result = jax.lax.cond(iter_num + 1 == n, _inner_close, lambda r: r, result)
         return result
 
