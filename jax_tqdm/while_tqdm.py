@@ -80,7 +80,7 @@ def while_tqdm(  # noqa: D401 – function acts as a decorator factory
 
             # Update the progress-bar.  ``build_tqdm`` expects a tuple so we
             # wrap and unwrap accordingly.
-            (inner_carry,) = update_progress_bar((inner_carry,), iter_num, bar_id)
+            (inner_carry,) = update_progress_bar((inner_carry,), iter_num, bar_id, {'carry': carry})
 
             # Call the original body function.
             result = func(inner_carry)  # type: ignore[arg-type]

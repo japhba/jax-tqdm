@@ -1,3 +1,7 @@
+# -- FORK --
+This fork adds functionality for a while-loop as well as the ability to pass a postfix to tqdm
+
+
 # JAX-Tqdm
 
 Add a [tqdm](https://github.com/tqdm/tqdm) progress bar to your JAX scans and loops.

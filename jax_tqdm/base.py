@@ -57,6 +57,7 @@ def build_tqdm(
     desc = kwargs.pop("desc", f"Running for {n:,} iterations")
     message = kwargs.pop("message", desc)
     position_offset = kwargs.pop("position", 0)
+    postfix = kwargs.pop("postfix", {})
 
     for kwarg in ("total", "mininterval", "maxinterval", "miniters"):
         kwargs.pop(kwarg, None)
@@ -89,8 +90,9 @@ def build_tqdm(
             **kwargs,
         )
 
-    def _update_tqdm(bar_id: int) -> None:
+    def _update_tqdm(bar_id: int, postfix_dict) -> None:
         tqdm_bars[int(bar_id)].update(print_rate)
+        tqdm_bars[0].set_postfix(postfix_dict)
 
     def _close_tqdm(bar_id: int) -> None:
         _pbar = tqdm_bars.pop(int(bar_id))
@@ -98,7 +100,7 @@ def build_tqdm(
         _pbar.clear()
         _pbar.close()
 
-    def update_progress_bar(carry: A, iter_num: int, bar_id: int) -> A:
+    def update_progress_bar(carry: A, iter_num: int, bar_id: int, postfix: dict) -> A:
         """Updates tqdm from a JAX scan or loop"""
 
         def _inner_init(_i: int, _carry: A) -> A:
@@ -108,7 +110,7 @@ def build_tqdm(
         def _inner_update(i: int, _carry: A) -> A:
             _ = jax.lax.cond(
                 i % print_rate == 0,
-                lambda: callback(_update_tqdm, bar_id, ordered=True),
+                lambda: callback(_update_tqdm, bar_id, ordered=True, postfix_dict=postfix),
                 lambda: None,
             )
             return _carry
