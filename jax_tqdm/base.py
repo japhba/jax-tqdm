@@ -100,7 +100,7 @@ def build_tqdm(
         _pbar.clear()
         _pbar.close()
 
-    def update_progress_bar(carry: A, iter_num: int, bar_id: int, postfix: dict) -> A:
+    def update_progress_bar(carry: A, iter_num: int, bar_id: int, postfix: dict = {}) -> A:
         """Updates tqdm from a JAX scan or loop"""
 
         def _inner_init(_i: int, _carry: A) -> A:

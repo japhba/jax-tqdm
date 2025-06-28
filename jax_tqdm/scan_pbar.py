@@ -39,6 +39,7 @@ def scan_tqdm(
     """
 
     update_progress_bar, close_tqdm = build_tqdm(n, print_rate, tqdm_type, **kwargs)
+    last_is_postfix = kwargs.pop('last_is_postfix', False)
 
     def _scan_tqdm(func: ScanFn) -> WrappedScanFn:
         """Decorator that adds a tqdm progress bar to `body_fun` used in `jax.lax.scan`.
@@ -52,16 +53,18 @@ def scan_tqdm(
                 iter_num, *_ = x
             else:
                 iter_num = x
+                
+            postfix = carry[-1]
 
             if isinstance(carry, PBar):
                 bar_id = carry.id
                 carry_ = carry.carry
-                carry_, x = update_progress_bar((carry_, x), iter_num, bar_id)
+                carry_, x = update_progress_bar((carry_, x), iter_num, bar_id, postfix if isinstance(postfix, dict) and last_is_postfix else {})
                 result = func(carry_, x)
                 result = (PBar(id=bar_id, carry=result[0]), result[1])
                 return close_tqdm(result, iter_num, bar_id)
             else:
-                carry, x = update_progress_bar((carry, x), iter_num, 0)
+                carry, x = update_progress_bar((carry, x), iter_num, 0, postfix if isinstance(postfix, dict) and last_is_postfix else {})
                 result = func(carry, x)
                 return close_tqdm(result, iter_num, 0)
 
