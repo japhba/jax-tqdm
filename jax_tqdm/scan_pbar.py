@@ -38,8 +38,8 @@ def scan_tqdm(
         Progress bar wrapping function.
     """
 
-    update_progress_bar, close_tqdm = build_tqdm(n, print_rate, tqdm_type, **kwargs)
     last_is_postfix = kwargs.pop('last_is_postfix', False)
+    update_progress_bar, close_tqdm = build_tqdm(n, print_rate, tqdm_type, **kwargs)
 
     def _scan_tqdm(func: ScanFn) -> WrappedScanFn:
         """Decorator that adds a tqdm progress bar to `body_fun` used in `jax.lax.scan`.
