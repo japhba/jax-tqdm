@@ -58,6 +58,7 @@ def build_tqdm(
     message = kwargs.pop("message", desc)
     position_offset = kwargs.pop("position", 0)
     postfix = kwargs.pop("postfix", {})
+    format = kwargs.pop("format", None)
 
     for kwarg in ("total", "mininterval", "maxinterval", "miniters"):
         kwargs.pop(kwarg, None)
@@ -92,7 +93,7 @@ def build_tqdm(
 
     def _update_tqdm(bar_id: int, postfix_dict) -> None:
         tqdm_bars[int(bar_id)].update(print_rate)
-        tqdm_bars[0].set_postfix(postfix_dict)
+        tqdm_bars[0].set_postfix({k: f"{v:.4f}" for k, v in postfix_dict.items()} if format else postfix_dict)
 
     def _close_tqdm(bar_id: int) -> None:
         _pbar = tqdm_bars.pop(int(bar_id))
