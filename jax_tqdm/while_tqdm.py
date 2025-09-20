@@ -1,5 +1,5 @@
 from time import sleep
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, Optional, TypeVar, Sequence
 
 from jax_tqdm.base import PBar, build_tqdm  # type: ignore
 
@@ -13,22 +13,35 @@ WrappedWhileFn = WhileFn | Callable[[PBar[C]], PBar[C]]
 
 
 def while_tqdm(  # noqa: D401 – function acts as a decorator factory
-    n: int,
+    n: Optional[int] = None,
     print_rate: Optional[int] = None,
     tqdm_type: str = "auto",
+    *,
+    print_s: Optional[Sequence[float]] = None,
+    s_max: Optional[float] = None,
+    last_is_postfix: bool = False,
+    postfix_fmt_str: Optional[dict[str, str]] = None,
     **kwargs: Any,
 ) -> Callable[[WhileFn], WrappedWhileFn]:
     """Decorator factory that adds a tqdm progress-bar to a JAX ``while_loop``.
 
     Parameters
     ----------
-    n : int
-        Maximum number of iterations expected for the ``while_loop``.
-    print_rate : int, optional
+    n : int | None
+        Maximum number of iterations expected for the ``while_loop``. If using
+        schedule-based mode via ``print_s``/``s_max``, ``n`` may be ``None``.
+    print_rate : int | None, optional
         Update rate for the progress-bar.  If *None* (default), it will be set
         to *n // 20* so that roughly twenty updates are shown.
     tqdm_type : {"auto", "std", "notebook"}
         Which tqdm flavour to use.  See :func:`jax_tqdm.base.build_tqdm`.
+    print_s : Sequence[float] | None
+        Optional schedule of elapsed-time thresholds; enables schedule mode.
+        Requires ``s_max``.
+    s_max : float | None
+        Maximum elapsed time for schedule-based mode; required if ``print_s``.
+    last_is_postfix : bool
+        If True and the carry is a tuple, treat its last element as postfix dict.
     **kwargs : Any
         Extra keyword arguments forwarded directly to :pyclass:`tqdm.tqdm`.
 
@@ -58,8 +71,17 @@ def while_tqdm(  # noqa: D401 – function acts as a decorator factory
     loops, this decorator will seamlessly integrate with it.
     """
 
-    last_is_postfix = kwargs.pop('last_is_postfix', False)
-    update_progress_bar, close_tqdm = build_tqdm(n, print_rate, tqdm_type, **kwargs)
+    # Detect schedule-based progress mode
+    schedule_mode = print_s is not None
+    update_progress_bar, close_tqdm = build_tqdm(
+        n,
+        print_rate,
+        tqdm_type,
+        print_s=print_s,
+        s_max=s_max,
+        postfix_fmt_str=postfix_fmt_str,
+        **kwargs,
+    )
 
     def _while_tqdm(func: WhileFn) -> WrappedWhileFn:  # noqa: D401
         """Internal decorator that injects the progress-bar logic."""
@@ -73,18 +95,33 @@ def while_tqdm(  # noqa: D401 – function acts as a decorator factory
                 bar_id = 0  # top-level bar
                 inner_carry = carry
 
-            # Extract the current iteration index from the *carry*.
-            if isinstance(inner_carry, tuple):
-                iter_num = inner_carry[0]
+            # Extract iteration index or progress value depending on mode
+            if schedule_mode:
+                # First element of carry is elapsed time s
+                if isinstance(inner_carry, tuple):
+                    s = inner_carry[0]  # type: ignore[index]
+                else:
+                    s = inner_carry  # type: ignore[assignment]
+                iter_num = 1  # dummy non-zero to avoid repeated init; base ensures define-if-needed
+                progress = s  # pass elapsed time to base
             else:
-                # Fall-back: assume the *carry* **is** the iteration counter.
-                iter_num = inner_carry  # type: ignore[assignment]
-                
-            postfix = carry[-1]
+                # Iteration-based: first element is the iteration counter
+                if isinstance(inner_carry, tuple):
+                    iter_num = inner_carry[0]
+                else:
+                    iter_num = inner_carry  # type: ignore[assignment]
+                progress = None
+
+            # Optional postfix is the last element of the inner_carry when enabled
+            if last_is_postfix and isinstance(inner_carry, tuple):
+                _maybe_postfix = inner_carry[-1]
+                postfix = _maybe_postfix if isinstance(_maybe_postfix, dict) else {}
+            else:
+                postfix = {}
 
             # Update the progress-bar.  ``build_tqdm`` expects a tuple so we
             # wrap and unwrap accordingly.
-            (inner_carry,) = update_progress_bar((inner_carry,), iter_num, bar_id, postfix if isinstance(postfix, dict) and last_is_postfix else {})
+            (inner_carry,) = update_progress_bar((inner_carry,), iter_num, bar_id, progress, postfix)
 
             # Call the original body function.
             result = func(inner_carry)  # type: ignore[arg-type]
@@ -94,7 +131,7 @@ def while_tqdm(  # noqa: D401 – function acts as a decorator factory
                 result = PBar(id=bar_id, carry=result)  # type: ignore[assignment]
 
             # Potentially close the bar when *iter_num* reaches *n - 1*.
-            return close_tqdm(result, iter_num, bar_id)  # type: ignore[return-value]
+            return close_tqdm(result, iter_num, bar_id, progress)  # type: ignore[return-value]
 
         return wrapper_progress_bar_body  # type: ignore[return-value]
 

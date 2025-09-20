@@ -1,4 +1,4 @@
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, Optional, TypeVar, Sequence
 
 from .base import PBar, build_tqdm
 
@@ -13,6 +13,10 @@ def loop_tqdm(
     n: int,
     print_rate: Optional[int] = None,
     tqdm_type: str = "auto",
+    *,
+    print_s: Optional[Sequence[float]] = None,
+    s_max: Optional[float] = None,
+    postfix_fmt_str: Optional[dict[str, str]] = None,
     **kwargs: Any,
 ) -> Callable[[LoopFn], WrappedLoopFn]:
     """
@@ -27,6 +31,10 @@ def loop_tqdm(
         by default the print rate will 1/20th of the total number of steps.
     tqdm_type: str
         Type of progress-bar, should be one of "auto", "std", or "notebook".
+    print_s : Sequence[float] | None
+        Optional elapsed-time thresholds; enables schedule mode and requires ``s_max``.
+    s_max : float | None
+        Maximum elapsed time for schedule-based mode; required if ``print_s``.
     **kwargs
         Extra keyword arguments to pass to tqdm.
 
@@ -36,7 +44,15 @@ def loop_tqdm(
         Progress bar wrapping function.
     """
 
-    update_progress_bar, close_tqdm = build_tqdm(n, print_rate, tqdm_type, **kwargs)
+    update_progress_bar, close_tqdm = build_tqdm(
+        n,
+        print_rate,
+        tqdm_type,
+        print_s=print_s,
+        s_max=s_max,
+        postfix_fmt_str=postfix_fmt_str,
+        **kwargs,
+    )
 
     def _loop_tqdm(func: LoopFn) -> WrappedLoopFn:
         """
@@ -48,12 +64,12 @@ def loop_tqdm(
             if isinstance(val, PBar):
                 bar_id = val.id
                 val = val.carry
-                i, val = update_progress_bar((i, val), i, bar_id)
+                i, val = update_progress_bar((i, val), i, bar_id, None, {})
                 result = func(i, val)
                 result = PBar(id=bar_id, carry=result)
                 return close_tqdm(result, i, bar_id)
             else:
-                i, val = update_progress_bar((i, val), i, 0)
+                i, val = update_progress_bar((i, val), i, 0, None, {})
                 result = func(i, val)
                 return close_tqdm(result, i, 0)
 

@@ -1,6 +1,59 @@
 # -- FORK --
-This fork adds functionality for a while-loop as well as the ability to pass a postfix to tqdm
 
+## Progress bars with jax-tqdm
+
+This project vendors a customized `jax_tqdm` with enhanced progress bars for JAX loops.
+
+### while_tqdm
+
+`while_tqdm` is a decorator factory that adds a tqdm progress bar to a `jax.lax.while_loop` body function.
+
+```python
+from jax_tqdm.while_tqdm import while_tqdm
+
+@while_tqdm(
+    n=None,                 # int | None; required unless using schedule mode
+    print_rate=None,        # int | None; default n//20
+    tqdm_type="auto",      # "auto" | "std" | "notebook"
+    print_s=None,           # list/array of elapsed-time thresholds (schedule mode)
+    s_max=None,             # float; required if print_s
+    last_is_postfix=False,  # if True, treat carry's last element as postfix dict
+    postfix_fmt_str=None,   # dict[str, str]; per-key format overrides for postfix
+    desc="Training",       # forwarded to tqdm
+)
+def body(carry):
+    i, state = carry  # i must be iteration counter when not using schedule mode
+    # ... do work ...
+    return (i + 1, state)
+```
+
+There are two modes:
+
+- Iteration-based: Provide `n` (and optionally `print_rate`). The bar updates every `print_rate` iterations (defaults to about 20 updates across `n`).
+- Schedule-based: Provide `print_s` (sequence of thresholds) and `s_max` (maximum elapsed-time). The bar advances only when `progress` crosses thresholds in `print_s`. In this mode, you should pass the current elapsed-time `progress` through the decorator; our wrapper handles forwarding.
+
+### Postfix formatting
+
+Postfix values shown next to the bar are formatted by default as follows:
+- Integers: `"{value}"`
+- Floats: `f"{value:.4f}"` (configurable precision via `postfix_decimals` forwarded to tqdm kwargs)
+
+You can override the formatting per key using `postfix_fmt_str`, mapping keys to Python format specs. For example:
+
+```python
+@while_tqdm(
+    n=10_000,
+    postfix_fmt_str={"loss": ".3e", "acc": ".2%", "lr": ".1e"},
+)
+def body(carry):
+    i, state, metrics = carry
+    # set metrics as the last element when using last_is_postfix=True
+    return (i + 1, state, metrics)
+```
+
+If a format fails for a given value, the code falls back to sensible defaults.
+
+Identical kwargs and behavior are available for `scan_tqdm` and `loop_tqdm`.
 
 # JAX-Tqdm
 
